@@ -1,1 +1,208 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <time.h>
+#include <errno.h>
+#include <string.h>
 
+#define NUM_CARDS 48 
+#define MAX_PLAYERS 10
+#define HAND_SIZE 5
+
+typedef struct {
+    char col;
+    int num; 
+} Card;
+
+void initializeDeck(Card deck[]) {
+    int j = 0;
+    char colors[] = {'r', 'g', 'b', 'y'}; 
+    for ( int i = 0; i < 4; i++) {
+        for (int num = 1; num <= 10; num++) {  
+            deck[j].col = colors[i];
+            deck[j].num = num;
+            j = j + 1;
+        }
+        
+        deck[j].col = colors[i];
+        deck[j].num = 11; 
+        j = j + 1;
+        deck[j].col = colors[i];
+        deck[j].num = 12; 
+        j = j + 1;
+    }
+}
+
+void deckShuffle(Card deck[]) {
+    srand(time(0));
+    for (int i = 0; i < NUM_CARDS; i++) {
+        int r = rand() % NUM_CARDS;
+        Card temp = deck[i];
+        deck[i] = deck[r];
+        deck[r] = temp;
+    }
+}
+
+void cardprint(Card ucard) {
+    if (ucard.num == 11) {
+        printf("%cSkip", ucard.col);  
+    } else if (ucard.num == 12) {
+        printf("%cReverse", ucard.col);  
+    } else {
+        printf("%c%d", ucard.col, ucard.num);  
+    }
+}
+
+int ValidMove(Card curCard, Card playCard) {
+    return (playCard.col == curCard.col || playCard.num == curCard.num);
+}
+
+void printHand(Card hand[], int handSize) {
+    printf("Player's hand: ");
+    for (int i = 0; i < handSize; i++) {
+        printf("%d: ", i + 1);
+        cardprint(hand[i]);
+        if (i < handSize - 1) {
+            printf(", ");
+        }
+    }
+    printf("\n");
+}
+
+Card cardDraw(Card deck[], int* deck_Index) {
+    return deck[(*deck_Index)++];
+}
+
+void removeCardFromHand(Card hand[], int* sizeOfHand, int index) {
+    for (int i = index; i < *sizeOfHand - 1; i++) {
+        hand[i] = hand[i + 1];
+    }
+    (*sizeOfHand)--;
+}
+void saveGame(FILE* file, int playingPlayer, Card playingCard, Card player_Hands[][HAND_SIZE], int player_HandSizes[], int num_Players) {
+    fprintf(file,"Current player: %d\n",playingPlayer+1);
+    fprintf(file,"Current card: ");
+    if (playingCard.num == 11) {
+        fprintf(file,"%cSkip\n",playingCard.col);}
+     else if (playingCard.num == 12) {
+        fprintf(file,"%cReverse\n",playingCard.col);}
+     else {
+        fprintf(file,"%c%d\n",playingCard.col,playingCard.num);
+    }
+    for (int i = 0;i< num_Players;i++) {
+        fprintf(file,"Player %d's hand: ",i + 1);
+        for (int j = 0;j < player_HandSizes[i];j++) {
+            if (player_Hands[i][j].num == 11) {
+                fprintf(file,"%cSkip ",player_Hands[i][j].col);}
+             else if (player_Hands[i][j].num == 12) {
+                fprintf(file,"%cReverse ",player_Hands[i][j].col);}
+             else {
+                fprintf(file,"%c%d ",player_Hands[i][j].col,player_Hands[i][j].num);}
+            
+        }
+        fprintf(file,"\n");
+    }
+    fprintf(file,"-------------------------------------\n");
+}
+int main() {
+    int num_Players,deck_Index = 0,direction=1;  
+    printf("Enter the number of players (2-%d): ", MAX_PLAYERS);
+    scanf("%d",&num_Players);
+
+    if (num_Players < 2 || num_Players > MAX_PLAYERS) {
+        printf("Invalid number of players. Please enter between 2 and %d players.\n", MAX_PLAYERS);
+        return 1;
+    }
+
+    FILE*file = fopen("game_record.txt", "w");
+    if (!file) {
+        printf("Failed to open record file: %s\n", strerror(errno));
+        return 1;}
+    
+
+    Card deck[NUM_CARDS];
+    initializeDeck(deck);
+    deckShuffle(deck);
+
+    Card player_Hands[MAX_PLAYERS][HAND_SIZE];
+    int player_HandSizes[MAX_PLAYERS];
+    for(int i=0;i< num_Players;i++){
+        for (int j=0;j< HAND_SIZE; j++){
+            player_Hands[i][j] =cardDraw(deck,&deck_Index);
+        }
+        player_HandSizes[i] = HAND_SIZE;
+    }
+
+    Card playingCard = cardDraw(deck,&deck_Index);
+    printf("Starting card: ");
+    cardprint(playingCard);
+    printf("\n");
+    
+     int playingPlayer = 0;
+    int gameover = 0;
+
+    while (!gameover) {
+        printf("\nPlayer %d's turn!\n", playingPlayer + 1);
+        printHand(player_Hands[playingPlayer], player_HandSizes[playingPlayer]);
+
+        saveGame(file, playingPlayer, playingCard, player_Hands, player_HandSizes, num_Players);
+
+        int choice;
+
+        printf("Kindly choose a card to play (1-%d) or 0 to draw a card: ", player_HandSizes[playingPlayer]);
+        scanf("%d", &choice);
+
+        if (choice == 0){
+            printf("Player %d is drawing a card......\n", playingPlayer + 1);
+
+            if (deck_Index < NUM_CARDS){
+                player_Hands[playingPlayer][player_HandSizes[playingPlayer]] = cardDraw(deck, &deck_Index); 
+                player_HandSizes[playingPlayer]++;
+            } 
+            else{
+                printf("Oops!!! Deck is out of cards!\n");
+            }
+        }else if (choice > 0 && choice <= player_HandSizes[playingPlayer]){
+            Card playedCard = player_Hands[playingPlayer][choice - 1];
+
+            if (ValidMove(playingCard, playedCard)){
+                printf("Player %d played: ", playingPlayer + 1);
+                cardprint(playedCard);
+                printf("\n");
+                playingCard = playedCard;
+                removeCardFromHand(player_Hands[playingPlayer], &player_HandSizes[playingPlayer], choice - 1); 
+
+
+                if (playingCard.num == 11){
+                    printf("Player %d's turn is skipped!\n", (playingPlayer + direction + num_Players) % num_Players + 1);
+                    playingPlayer = (playingPlayer + direction + num_Players) % num_Players;
+                }
+
+                if (playingCard.num == 12){
+                    direction = -direction; 
+                    printf("Oho! Turn is reversed!\n");
+                }
+            } else{
+                printf("Invalid move!!! Try again please.\n");
+                continue;
+            }
+        } 
+        else{
+            printf("Invalid input!!! Try again please.\n");
+            continue;
+        }
+
+
+        if (player_HandSizes[playingPlayer] == 0){
+            printf("Player %d wins!!! YAYAYAYAYAYA\n", playingPlayer + 1);
+            gameover = 1;
+        } 
+        else{
+            playingPlayer = (playingPlayer + direction + num_Players) % num_Players;
+        }
+    }
+
+    fprintf(file, "GAME IS OVER! THE WINNER IS %d\n", playingPlayer + 1);
+    fclose(file);
+
+    return 0;
+}
