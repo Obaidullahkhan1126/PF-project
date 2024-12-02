@@ -41,16 +41,26 @@ void deckShuffle(Card deck[]) {
         deck[r] = temp;
     }
 }
-
 void cardprint(Card ucard) {
+    char* colorCode;
+    switch (ucard.col) {
+        case 'r': colorCode = "\033[31m"; break; 
+        case 'g': colorCode = "\033[32m"; break; 
+        case 'b': colorCode = "\033[34m"; break; 
+        case 'y': colorCode = "\033[33m"; break; 
+        default:  colorCode = "\033[0m";  break; 
+    }
+
     if (ucard.num == 11) {
-        printf("%cSkip", ucard.col);  
+        printf("%sSkip\033[0m", colorCode);
     } else if (ucard.num == 12) {
-        printf("%cReverse", ucard.col);  
+        printf("%sReverse\033[0m", colorCode);
     } else {
-        printf("%c%d", ucard.col, ucard.num);  
+        printf("%s%d\033[0m", colorCode, ucard.num);
     }
 }
+
+
 
 int ValidMove(Card curCard, Card playCard) {
     return (playCard.col == curCard.col || playCard.num == curCard.num);
@@ -137,10 +147,13 @@ int main() {
     cardprint(playingCard);
     printf("\n");
     
-     int playingPlayer = 0;
+    int playingPlayer = 0;
     int gameover = 0;
 
     while (!gameover) {
+    	printf("\nLast card played: ");
+        cardprint(playingCard);
+        printf("\n");
         printf("\nPlayer %d's turn!\n", playingPlayer + 1);
         printHand(player_Hands[playingPlayer], player_HandSizes[playingPlayer]);
 
@@ -150,18 +163,40 @@ int main() {
 
         printf("Kindly choose a card to play (1-%d) or 0 to draw a card: ", player_HandSizes[playingPlayer]);
         scanf("%d", &choice);
+        
+         if (choice == 0) {
+    printf("Player %d is drawing a card...\n", playingPlayer + 1);
 
-        if (choice == 0){
-            printf("Player %d is drawing a card......\n", playingPlayer + 1);
+    if (deck_Index < NUM_CARDS) {
+        Card drawnCard = cardDraw(deck, &deck_Index); 
+        printf("Drawn card: ");
+        cardprint(drawnCard);
+        printf("\n");
 
-            if (deck_Index < NUM_CARDS){
-                player_Hands[playingPlayer][player_HandSizes[playingPlayer]] = cardDraw(deck, &deck_Index); 
-                player_HandSizes[playingPlayer]++;
-            } 
-            else{
-                printf("Oops!!! Deck is out of cards!\n");
+        if (ValidMove(playingCard, drawnCard)) {
+            printf("The drawn card is playable! Playing the card.\n");
+            playingCard = drawnCard; 
+            if (drawnCard.num == 11) {
+                printf("Player %d's turn is skipped!\n", (playingPlayer + direction + num_Players) % num_Players + 1);
+                playingPlayer = (playingPlayer + direction + num_Players) % num_Players;
             }
-        }else if (choice > 0 && choice <= player_HandSizes[playingPlayer]){
+
+            if (drawnCard.num == 12) {
+                direction = -direction; 
+                printf("Oho! Turn is reversed!\n");
+            }
+        } else {
+            
+            player_Hands[playingPlayer][player_HandSizes[playingPlayer]] = drawnCard;
+            player_HandSizes[playingPlayer]++;
+            printf("The drawn card is not playable. It has been added to the hand.\n");
+        }
+    } else {
+        printf("Oops!!! Deck is out of cards!\n");
+    }
+}
+
+        else if (choice > 0 && choice <= player_HandSizes[playingPlayer]){
             Card playedCard = player_Hands[playingPlayer][choice - 1];
 
             if (ValidMove(playingCard, playedCard)){
@@ -170,6 +205,9 @@ int main() {
                 printf("\n");
                 playingCard = playedCard;
                 removeCardFromHand(player_Hands[playingPlayer], &player_HandSizes[playingPlayer], choice - 1); 
+                
+                if (player_HandSizes[playingPlayer] == 1) {
+                printf("Player %d says UNO!\n", playingPlayer + 1);}
 
 
                 if (playingCard.num == 11){
